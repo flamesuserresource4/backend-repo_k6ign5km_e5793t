@@ -1,48 +1,59 @@
 """
-Database Schemas
+Database Schemas for DealWiseDe
 
-Define your MongoDB collection schemas here using Pydantic models.
-These schemas are used for data validation in your application.
-
+Define MongoDB collection schemas here using Pydantic models.
 Each Pydantic model represents a collection in your database.
-Model name is converted to lowercase for the collection name:
-- User -> "user" collection
-- Product -> "product" collection
-- BlogPost -> "blogs" collection
+Collection name is lowercase of class name.
 """
 
-from pydantic import BaseModel, Field
-from typing import Optional
+from pydantic import BaseModel, Field, HttpUrl
+from typing import Optional, List, Literal
+from datetime import datetime
 
-# Example schemas (replace with your own):
-
+# Users who save favorites, simple profile for now
 class User(BaseModel):
-    """
-    Users collection schema
-    Collection name: "user" (lowercase of class name)
-    """
     name: str = Field(..., description="Full name")
     email: str = Field(..., description="Email address")
-    address: str = Field(..., description="Address")
-    age: Optional[int] = Field(None, ge=0, le=120, description="Age in years")
-    is_active: bool = Field(True, description="Whether user is active")
+    avatar_url: Optional[str] = None
+    is_active: bool = True
 
-class Product(BaseModel):
-    """
-    Products collection schema
-    Collection name: "product" (lowercase of class name)
-    """
-    title: str = Field(..., description="Product title")
-    description: Optional[str] = Field(None, description="Product description")
-    price: float = Field(..., ge=0, description="Price in dollars")
-    category: str = Field(..., description="Product category")
-    in_stock: bool = Field(True, description="Whether product is in stock")
+# A single normalized product listing returned from a provider (amazon/flipkart/etc.)
+class Listing(BaseModel):
+    sku: str = Field(..., description="Stable identifier for product (provider SKU or ASIN)")
+    title: str
+    image_url: Optional[HttpUrl] = None
+    url: Optional[HttpUrl] = None
+    merchant: Literal["amazon", "flipkart", "other"] = "other"
+    price: float = Field(..., ge=0)
+    currency: str = Field("INR", description="ISO currency code")
+    rating: Optional[float] = Field(None, ge=0, le=5)
+    total_reviews: Optional[int] = Field(None, ge=0)
+    availability: Optional[str] = None
+    fetched_at: datetime = Field(default_factory=datetime.utcnow)
 
-# Add your own schemas here:
-# --------------------------------------------------
+# Store price over time for a listing
+class Pricehistory(BaseModel):
+    sku: str
+    merchant: str
+    price: float = Field(..., ge=0)
+    currency: str = Field("INR")
+    timestamp: datetime = Field(default_factory=datetime.utcnow)
 
-# Note: The Flames database viewer will automatically:
-# 1. Read these schemas from GET /schema endpoint
-# 2. Use them for document validation when creating/editing
-# 3. Handle all database operations (CRUD) directly
-# 4. You don't need to create any database endpoints!
+# Saved user favorites
+class Favorite(BaseModel):
+    user_id: str
+    sku: str
+    title: str
+    image_url: Optional[str] = None
+    url: Optional[str] = None
+    merchant: str
+    price: float
+    currency: str = "INR"
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+
+# Store search queries for analytics
+class Searchquery(BaseModel):
+    query: str
+    user_id: Optional[str] = None
+    providers: List[str] = ["amazon", "flipkart"]
+    created_at: datetime = Field(default_factory=datetime.utcnow)
